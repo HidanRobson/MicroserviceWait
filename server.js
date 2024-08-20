@@ -1,6 +1,8 @@
 import { connect } from "amqplib";
 import bodyParser from "body-parser";
 import express from "express";
+import { v4 as uuidv4 } from "uuid";
+
 const app = express();
 
 app.use(bodyParser.json());
@@ -19,26 +21,26 @@ async function main() {
   // Criar o roteador para adicionar usuários na fila
   app.post("/adicionar_fila", async (req, res) => {
     const { nome } = req.body;
-    await channel.sendToQueue(
+    const id = uuidv4(); // Gere um ID único para o usuário
+    channel.sendToQueue(
       "fila_espera",
-      Buffer.from(JSON.stringify({ nome, status: "esperando" }))
+      Buffer.from(JSON.stringify({ nome, status: "esperando" })),
+      { correlationId: id }
     );
     res.send("Usuário adicionado na fila de espera");
   });
 
   // Criar o roteador para remover usuários da fila
   app.delete("/remover_fila", async (req, res) => {
-    const { nome } = req.body;
-    const message = await channel.get("fila_espera");
-    if (
-      message &&
-      message.content.toString() ===
-        JSON.stringify({ nome, status: "esperando" })
-    ) {
-      await channel.ack(message);
-      await channel.sendToQueue(
+    const { id } = req.body;
+    const message = await channel.get("fila_espera", { noAck: false });
+    if (message && message.properties.correlationId === id) {
+      channel.ack(message);
+      channel.sendToQueue(
         "fila_saidas",
-        Buffer.from(JSON.stringify({ nome, status: "saiu" }))
+        Buffer.from(
+          JSON.stringify({ nome: message.content.toString(), status: "saiu" })
+        )
       );
       res.send("Usuário removido da fila de espera");
     } else {
@@ -48,17 +50,18 @@ async function main() {
 
   // Criar o roteador para atualizar o status do usuário para "cortando cabelo"
   app.put("/cortar_cabelo", async (req, res) => {
-    const { nome } = req.body;
-    const message = await channel.get("fila_espera");
-    if (
-      message &&
-      message.content.toString() ===
-        JSON.stringify({ nome, status: "esperando" })
-    ) {
-      await channel.ack(message);
-      await channel.sendToQueue(
+    const { id } = req.body;
+    const message = await channel.get("fila_espera", { noAck: false });
+    if (message && message.properties.correlationId === id) {
+      channel.ack(message);
+      channel.sendToQueue(
         "fila_espera",
-        Buffer.from(JSON.stringify({ nome, status: "cortando_cabelo" }))
+        Buffer.from(
+          JSON.stringify({
+            nome: message.content.toString(),
+            status: "cortando_cabelo",
+          })
+        )
       );
       res.send("Usuário está cortando cabelo");
     } else {
