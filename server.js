@@ -12,11 +12,20 @@ async function main() {
   const connection = await connect("amqp://localhost");
   const channel = await connection.createChannel();
 
+  const queueName = "fila_espera";
+  const queueOptions = {
+    durable: true,
+    exclusive: false,
+    autoDelete: false,
+  };
+
   // Criar a fila de espera
   await channel.assertQueue("fila_espera");
 
   // Criar a fila de registro de saídas
   await channel.assertQueue("fila_saidas");
+
+  await channel.assertQueue(queueName, queueOptions);
 
   // Criar o roteador para adicionar usuários na fila
   app.post("/adicionar_fila", async (req, res) => {
