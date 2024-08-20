@@ -12,8 +12,14 @@ async function main() {
   const connection = await connect("amqp://localhost");
   const channel = await connection.createChannel();
 
-  const queueName = "fila_espera";
-  const queueOptions = {
+  const queueFilaEspera = "fila_espera";
+  const queueOptionsFilaEspera = {
+    durable: true,
+    exclusive: false,
+    autoDelete: false,
+  };
+  const queueFilaBarbeirosDisponiveis = "fila_barbeiros_disponiveis";
+  const queueOptionsFilaBarbeirosDisponiveis = {
     durable: true,
     exclusive: false,
     autoDelete: false,
@@ -25,7 +31,15 @@ async function main() {
   // Criar a fila de registro de saídas
   await channel.assertQueue("fila_saidas");
 
-  await channel.assertQueue(queueName, queueOptions);
+  // Criar a fila de barbeiros disponíveis
+  await channel.assertQueue("fila_barbeiros_disponiveis");
+
+  await channel.assertQueue(queueFilaEspera, queueOptionsFilaEspera);
+
+  await channel.assertQueue(
+    queueFilaBarbeirosDisponiveis,
+    queueOptionsFilaBarbeirosDisponiveis
+  );
 
   // Criar o roteador para adicionar usuários na fila
   app.post("/adicionar_fila", async (req, res) => {
@@ -71,9 +85,40 @@ async function main() {
           })
         )
       );
+      channel.sendToQueue(
+        "fila_barbeiros_disponiveis",
+        Buffer.from(message.content.toString())
+      );
       res.send("Usuário está cortando cabelo");
     } else {
       res.status(404).send("Usuário não encontrado na fila de espera");
+    }
+  });
+
+  app.put("/terminar", async (req, res) => {
+    const { id } = req.body;
+
+    // Verificar se o usuário está na fila de barbeiros disponíveis
+    const message = await channel.get("fila_barbeiros_disponiveis", {
+      noAck: false,
+    });
+
+    if (message && message.properties.correlationId === id) {
+      channel.ack(message);
+      channel.sendToQueue(
+        "fila_saidas",
+        Buffer.from(
+          JSON.stringify({
+            nome: message.content.toString(),
+            status: "terminado",
+          })
+        )
+      );
+      res.send("Status atualizado para terminado");
+    } else {
+      res
+        .status(404)
+        .send("Usuário não encontrado na fila de barbeiros disponíveis");
     }
   });
 
