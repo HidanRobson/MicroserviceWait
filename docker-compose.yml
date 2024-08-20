@@ -1,18 +1,18 @@
 version: "3"
-
 services:
-  app:
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=myuser
+      - RABBITMQ_DEFAULT_PASS=mypassword
+
+  server:
     build: .
     ports:
       - "3000:3000"
     depends_on:
       - rabbitmq
-    environment:
-      - RABBITMQ_HOST=rabbitmq
-      - RABBITMQ_PORT=5672
-
-  rabbitmq:
-    image: rabbitmq:3.12-management
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+    command: node server.js
