@@ -1,7 +1,10 @@
 import { connect } from "amqplib";
+import bodyParser from "body-parser";
 import express from "express";
 const app = express();
 
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 // Conectar ao servidor RabbitMQ
 async function main() {
   const connection = await connect("amqp://localhost");
