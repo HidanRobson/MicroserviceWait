@@ -27,10 +27,9 @@ async function main() {
       Buffer.from(JSON.stringify({ nome, status: "esperando" })),
       { correlationId: id }
     );
-    res.send("Usuário adicionado na fila de espera");
+    res.send(`Usuário adicionado na fila de espera com ID: ${id}`);
   });
 
-  // Criar o roteador para remover usuários da fila
   app.delete("/remover_fila", async (req, res) => {
     const { id } = req.body;
     const message = await channel.get("fila_espera", { noAck: false });
